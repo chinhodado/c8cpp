@@ -1,6 +1,7 @@
 #include <vector>
+#include <SDL.h>
 
-using byte = unsigned char;
+using byte    = unsigned char;
 using u_short = unsigned short;
 
 class Chip8 {
@@ -28,7 +29,7 @@ public:
 	u_short pc;
 
 	/* Pixel state map representing our screen. Each pixel is a byte in our map (not a bit) */
-	byte gfx[64][32];
+	byte gfx[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 	/* The delay timer */
 	byte delay_timer;
@@ -50,7 +51,8 @@ public:
 
 	void initialize();
 	void emulateCycle();
-	void loadGame(std::string);
-	void setKeys() {};
+	void loadGame();
+	void handleKey(SDL_Event e);
+	void clearScreen();
 private:
 };

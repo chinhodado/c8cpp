@@ -3,48 +3,42 @@
 #include <time.h>
 #include <string>
 #include "chip8.h"
+#include <SDL.h>
+#include <stdio.h>
+#include <iostream>
+#include <fstream>
 
-Chip8 chip8;
+using namespace std;
 
 byte getKeyPress() {
+	printf("Enter a key: \n");
+	std::cin.get();
 	return 0;
 }
 
-void setupGraphics() {
-}
+void Chip8::loadGame() {
+	streampos size;
 
-void drawGraphics() {
-}
+	ifstream file("games/pong2.c8", ios::in | ios::binary | ios::ate);
+	if (file.is_open()) {
+		size = file.tellg();
+		byte *ptr;
+		ptr = memory + 0x200;
+		file.seekg(0, ios::beg);
+		file.read((char *) ptr, size);
+		file.close();
 
-void setupInput() {
-}
-
-void Chip8::loadGame(std::string gameName) {
-}
-
-int _tmain(int argc, _TCHAR* argv[]) {
-	// Set up render system and register input callbacks
-	setupGraphics();
-	setupInput();
-
-	// Initialize the Chip8 system and load the game into the memory
-	chip8.initialize();
-	chip8.loadGame("pong");
-
-	// Emulation loop
-	for (;;) {
-		// Emulate one cycle
-		chip8.emulateCycle();
-
-		// If the draw flag is set, update the screen
-		if (chip8.drawFlag)
-			drawGraphics();
-
-		// Store key press state (Press and Release)
-		chip8.setKeys();
+		cout << "File loaded complete.\n";
 	}
+	else cout << "Unable to open file.\n";
+}
 
-	return 0;
+void Chip8::clearScreen() {
+	for (int i = 0; i < SCREEN_HEIGHT; i++) {
+		for (int j = 0; j < SCREEN_WIDTH; j++) {
+			gfx[i][j] = 0;
+		}
+	}
 }
 
 void Chip8::initialize() {
@@ -55,9 +49,22 @@ void Chip8::initialize() {
 	sp     = 0;      // Reset stack pointer
 
 	// Clear display
+	clearScreen();
+
 	// Clear stack
+	for (int i = 0; i < NUM_LEVEL_STACK; i++) {
+		stack[i] = 0;
+	}
+
 	// Clear registers V0-VF
+	for (int i = 0; i < NUM_REGISTERS; i++) {
+		V[i] = 0;
+	}
+
 	// Clear memory
+	for (int i = 0; i < MEMORY_SIZE; i++) {
+		memory[i] = 0;
+	}
 
 	// Load fontset
 	byte chip8_fontset[80] = {
@@ -83,12 +90,75 @@ void Chip8::initialize() {
 		memory[i] = chip8_fontset[i];
 
 	// Reset timers
+	delay_timer = 0;
+	sound_timer = 0;
 
 	// initialize random seed
-	srand(time(NULL));
+	srand((unsigned int)time(NULL));
+}
+
+void Chip8::handleKey(SDL_Event e) {
+	if (e.type == SDL_KEYDOWN) {
+		switch (e.key.keysym.sym) {
+		case SDLK_1: key[0x1] = 1; break;
+		case SDLK_2: key[0x2] = 1; break;
+		case SDLK_3: key[0x3] = 1; break;
+		case SDLK_4: key[0xC] = 1; break;
+
+		case SDLK_q: key[0x4] = 1; break;
+		case SDLK_w: key[0x5] = 1; break;
+		case SDLK_e: key[0x6] = 1; break;
+		case SDLK_r: key[0xD] = 1; break;
+
+		case SDLK_a: key[0x7] = 1; break;
+		case SDLK_s: key[0x8] = 1; break;
+		case SDLK_d: key[0x9] = 1; break;
+		case SDLK_f: key[0xE] = 1; break;
+
+		case SDLK_z: key[0xA] = 1; break;
+		case SDLK_x: key[0x0] = 1; break;
+		case SDLK_c: key[0xB] = 1; break;
+		case SDLK_v: key[0xF] = 1; break;
+
+		default:
+			break;
+		}
+	}
+	else if (e.type == SDL_KEYUP) {
+		switch (e.key.keysym.sym) {
+		case SDLK_1: key[0x1] = 0; break;
+		case SDLK_2: key[0x2] = 0; break;
+		case SDLK_3: key[0x3] = 0; break;
+		case SDLK_4: key[0xC] = 0; break;
+
+		case SDLK_q: key[0x4] = 0; break;
+		case SDLK_w: key[0x5] = 0; break;
+		case SDLK_e: key[0x6] = 0; break;
+		case SDLK_r: key[0xD] = 0; break;
+
+		case SDLK_a: key[0x7] = 0; break;
+		case SDLK_s: key[0x8] = 0; break;
+		case SDLK_d: key[0x9] = 0; break;
+		case SDLK_f: key[0xE] = 0; break;
+
+		case SDLK_z: key[0xA] = 0; break;
+		case SDLK_x: key[0x0] = 0; break;
+		case SDLK_c: key[0xB] = 0; break;
+		case SDLK_v: key[0xF] = 0; break;
+
+		default:
+			break;
+		}
+	}
 }
 
 void Chip8::emulateCycle() {
+	// mem boundary check
+	if (pc >= MEMORY_SIZE) {
+		printf("pc is out of memory boundary!");
+		std::cin.get();
+	}
+
 	// Fetch Opcode
 	opcode = memory[pc] << 8 | memory[pc + 1];
 
@@ -96,61 +166,54 @@ void Chip8::emulateCycle() {
 	drawFlag = false;
 
 	// Decode & execute opcode
-	byte nn = opcode & 0x00FF;
-	byte nnn = opcode & 0x0FFF;
-	byte x = (opcode & 0x0F00) >> 8;
-	byte y = (opcode & 0x00F0) >> 4;
+	byte nn     =  opcode & 0x00FF;
+	u_short nnn =  opcode & 0x0FFF;
+	byte x      = (opcode & 0x0F00) >> 8;
+	byte y      = (opcode & 0x00F0) >> 4;
 	switch (opcode & 0xF000) { // switch on first bit
 		case 0x0000:
 			switch (opcode & 0x000F) {
-				case 0x0000: // 0x00E0: clears the screen
-					for (int i = 0; i < SCREEN_WIDTH; i++) {
-						for (int j = 0; j < SCREEN_HEIGHT; j++) {
-							gfx[i][j] = 0;
-						}
-					}
+				case 0x0000: // 00E0: clears the screen
+					clearScreen();
+					drawFlag = true;
 					pc += 2;
 					break;
-				case 0x000E: // 0x00EE: returns from subroutine
+				case 0x000E: // 00EE: returns from subroutine
 					pc = stack[--sp];
 					stack[sp] = 0;
+					pc += 2;
 					break;
 				default:
-					printf("Unknown opcode [0x0000]: 0x%X\n", opcode);
+					printf("Unknown opcode: 0x%X\n", opcode);
+					break;
 			}
 			break;
-		case 0x1000: // 1NNN: jumps to address NNN.
-			pc = opcode & 0x0FFF;
+		case 0x1000: // 1NNN: jumps to address NNN
+			pc = nnn;
 			break;
 		case 0x2000: // 2NNN: calls the subroutine at address NNN
 			// TODO: make sure we don't get stack overflow
 			stack[sp] = pc;
 			++sp;
-			pc = opcode & 0x0FFF;
+			pc = nnn;
 			break;
 		case 0x3000: // 3XNN: skips the next instruction if VX equals NN
-			if (V[x] == nn) {
+			if (V[x] == nn)
 				pc += 4;
-			}
-			else {
+			else
 				pc += 2;
-			}
 			break;
 		case 0x4000: // 4XNN: skips the next instruction if VX doesn't equal NN
-			if (V[x] != nn) {
+			if (V[x] != nn)
 				pc += 4;
-			}
-			else {
+			else
 				pc += 2;
-			}
 			break;
 		case 0x5000: // 5XY0: skips the next instruction if VX equals VY
-			if (V[x] == V[y]) {
+			if (V[x] == V[y])
 				pc += 4;
-			}
-			else {
+			else
 				pc += 2;
-			}
 			break;
 		case 0x6000: // 6XNN: sets VX to NN
 			V[x] = nn;
@@ -178,13 +241,13 @@ void Chip8::emulateCycle() {
 					V[x] ^= V[y];
 					pc += 2;
 					break;
-				case 0x0004: // 8XY4: adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
+				case 0x0004: // 8XY4: adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't
 					V[0xF] = (V[x] + V[y] > 0xFF) ? 1 : 0;
 					V[x] += V[y];
 					pc += 2;
 					break;
 				case 0x0005: // 8XY5: VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't
-					V[0xF] = (V[x] > V[y]) ? 1 : 0;
+					V[0xF] = (V[x] >= V[y]) ? 1 : 0;
 					V[x] -= V[y];
 					pc += 2;
 					break;
@@ -194,33 +257,32 @@ void Chip8::emulateCycle() {
 					pc += 2;
 					break;
 				case 0x0007: // 8XY7: sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't
-					V[0xF] = V[y] > V[x] ? 1 : 0;
+					V[0xF] = V[y] >= V[x] ? 1 : 0;
 					V[x] = V[y] - V[x];
 					pc += 2;
 					break;
-				case 0x0008: // 8XYE: shifts VX left by one. VF is set to the value of the most significant bit of VX before the shift
+				case 0x000E: // 8XYE: shifts VX left by one. VF is set to the value of the most significant bit of VX before the shift
 					V[0xF] = V[x] & 0x80;
 					V[x] <<= 1;
 					pc += 2;
 					break;
 				default:
 					printf("Unknown opcode: 0x%X\n", opcode);
+					break;
 			}
 			break;
 		case 0x9000: // 9XY0: skips the next instruction if VX doesn't equal VY
-			if (V[x] != V[y]) {
+			if (V[x] != V[y])
 				pc += 4;
-			}
-			else {
+			else
 				pc += 2;
-			}
 			break;
 		case 0xA000: // ANNN: sets I to the address NNN
-			I = opcode & 0x0FFF;
+			I = nnn;
 			pc += 2;
 			break;
 		case 0xB000: // BNNN: jumps to the address NNN plus V0
-			pc = nnn + V[0x0];
+			pc = nnn + V[0];
 			break;
 		case 0xC000: // CXNN: sets VX to a random number and NN
 			V[x] = nn & rand();
@@ -233,21 +295,22 @@ void Chip8::emulateCycle() {
 				byte mem = memory[I + i];
 				for (int j = 0; j < 8; j++) {
 					byte spriteBit = mem & (0x80 >> j); // ok, horrible naming...
-					if (spriteBit == 1) { // we don't care if it is 0
-						byte screenBitBefore = gfx[(i + V[y]) % SCREEN_WIDTH][(j + V[x]) % SCREEN_HEIGHT];
+					if (spriteBit != 0) { // we don't care if it is 0
+						byte screenBitBefore = gfx[(i + V[y]) % SCREEN_HEIGHT][(j + V[x]) % SCREEN_WIDTH];
 						if (screenBitBefore == 1) {
 							V[0xF] = 1;
 						}
-						gfx[(i + V[y]) % SCREEN_WIDTH][(j + V[x]) % SCREEN_HEIGHT] = screenBitBefore ^ spriteBit; // aka xor 1
+						gfx[(i + V[y] % SCREEN_HEIGHT)][(j + V[x]) % SCREEN_WIDTH] ^= 1;
 					}
 				}
 			}
 			drawFlag = true;
+			pc += 2;
 			break;
 		case 0xE000:
 			switch (opcode & 0x00FF) {
 				case 0x009E: // EX9E: skips the next instruction if the key stored in VX is pressed
-					if (key[V[(opcode & 0x0F00) >> 8]] == 1)
+					if (key[V[x]] == 1)
 						pc += 4;
 					else
 						pc += 2;
@@ -282,6 +345,7 @@ void Chip8::emulateCycle() {
 					pc += 2;
 					break;
 				case 0x001E: // FX1E: adds VX to I
+					V[0xF] = (I + V[x] > 0xFFF) ? 1 : 0;
 					I += V[x];
 					pc += 2;
 					break;
@@ -309,7 +373,9 @@ void Chip8::emulateCycle() {
 					break;
 				default:
 					printf("Unknown opcode: 0x%X\n", opcode);
+					break;
 			}
+			break;
 		default:
 			printf("Unknown opcode: 0x%X\n", opcode);
 	}
