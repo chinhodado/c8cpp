@@ -4,26 +4,19 @@
 #include <string>
 #include "chip8.h"
 #include <SDL.h>
-#include <stdio.h>
 #include <iostream>
 #include <fstream>
 
 using namespace std;
 
-byte getKeyPress() {
-	printf("Enter a key: \n");
-	std::cin.get();
-	return 0;
-}
-
 void Chip8::loadGame() {
 	streampos size;
-
-	ifstream file("games/pong2.c8", ios::in | ios::binary | ios::ate);
+    gameName = "games/pong2.c8";
+    ifstream file(gameName, ios::in | ios::binary | ios::ate);
 	if (file.is_open()) {
 		size = file.tellg();
 		byte *ptr;
-		ptr = memory + 0x200;
+		ptr = memory + PROGRAM_START_LOC;
 		file.seekg(0, ios::beg);
 		file.read((char *) ptr, size);
 		file.close();
@@ -43,10 +36,10 @@ void Chip8::clearScreen() {
 
 void Chip8::initialize() {
 	// Initialize registers and memory once
-	pc     = 0x200;  // Program counter starts at 0x200
-	opcode = 0;      // Reset current opcode
-	I      = 0;      // Reset index register
-	sp     = 0;      // Reset stack pointer
+	pc     = PROGRAM_START_LOC;  // Program counter starts at 0x200
+	opcode = 0;                  // Reset current opcode
+	I      = 0;                  // Reset index register
+	sp     = 0;                  // Reset stack pointer
 
 	// Clear display
 	clearScreen();
@@ -93,32 +86,32 @@ void Chip8::initialize() {
 	delay_timer = 0;
 	sound_timer = 0;
 
-	// initialize random seed
+	// initialize random
 	srand((unsigned int)time(NULL));
 }
 
-void Chip8::handleKey(SDL_Event e) {
+void Chip8::handleKey(const SDL_Event& e) {
 	if (e.type == SDL_KEYDOWN) {
 		switch (e.key.keysym.sym) {
-		case SDLK_1: key[0x1] = 1; break;
-		case SDLK_2: key[0x2] = 1; break;
-		case SDLK_3: key[0x3] = 1; break;
-		case SDLK_4: key[0xC] = 1; break;
+		case SDLK_1: keys[0x1] = 1; break;
+		case SDLK_2: keys[0x2] = 1; break;
+		case SDLK_3: keys[0x3] = 1; break;
+		case SDLK_4: keys[0xC] = 1; break;
 
-		case SDLK_q: key[0x4] = 1; break;
-		case SDLK_w: key[0x5] = 1; break;
-		case SDLK_e: key[0x6] = 1; break;
-		case SDLK_r: key[0xD] = 1; break;
+		case SDLK_q: keys[0x4] = 1; break;
+		case SDLK_w: keys[0x5] = 1; break;
+		case SDLK_e: keys[0x6] = 1; break;
+		case SDLK_r: keys[0xD] = 1; break;
 
-		case SDLK_a: key[0x7] = 1; break;
-		case SDLK_s: key[0x8] = 1; break;
-		case SDLK_d: key[0x9] = 1; break;
-		case SDLK_f: key[0xE] = 1; break;
+		case SDLK_a: keys[0x7] = 1; break;
+		case SDLK_s: keys[0x8] = 1; break;
+		case SDLK_d: keys[0x9] = 1; break;
+		case SDLK_f: keys[0xE] = 1; break;
 
-		case SDLK_z: key[0xA] = 1; break;
-		case SDLK_x: key[0x0] = 1; break;
-		case SDLK_c: key[0xB] = 1; break;
-		case SDLK_v: key[0xF] = 1; break;
+		case SDLK_z: keys[0xA] = 1; break;
+		case SDLK_x: keys[0x0] = 1; break;
+		case SDLK_c: keys[0xB] = 1; break;
+		case SDLK_v: keys[0xF] = 1; break;
 
 		default:
 			break;
@@ -126,25 +119,25 @@ void Chip8::handleKey(SDL_Event e) {
 	}
 	else if (e.type == SDL_KEYUP) {
 		switch (e.key.keysym.sym) {
-		case SDLK_1: key[0x1] = 0; break;
-		case SDLK_2: key[0x2] = 0; break;
-		case SDLK_3: key[0x3] = 0; break;
-		case SDLK_4: key[0xC] = 0; break;
+		case SDLK_1: keys[0x1] = 0; break;
+		case SDLK_2: keys[0x2] = 0; break;
+		case SDLK_3: keys[0x3] = 0; break;
+		case SDLK_4: keys[0xC] = 0; break;
 
-		case SDLK_q: key[0x4] = 0; break;
-		case SDLK_w: key[0x5] = 0; break;
-		case SDLK_e: key[0x6] = 0; break;
-		case SDLK_r: key[0xD] = 0; break;
+		case SDLK_q: keys[0x4] = 0; break;
+		case SDLK_w: keys[0x5] = 0; break;
+		case SDLK_e: keys[0x6] = 0; break;
+		case SDLK_r: keys[0xD] = 0; break;
 
-		case SDLK_a: key[0x7] = 0; break;
-		case SDLK_s: key[0x8] = 0; break;
-		case SDLK_d: key[0x9] = 0; break;
-		case SDLK_f: key[0xE] = 0; break;
+		case SDLK_a: keys[0x7] = 0; break;
+		case SDLK_s: keys[0x8] = 0; break;
+		case SDLK_d: keys[0x9] = 0; break;
+		case SDLK_f: keys[0xE] = 0; break;
 
-		case SDLK_z: key[0xA] = 0; break;
-		case SDLK_x: key[0x0] = 0; break;
-		case SDLK_c: key[0xB] = 0; break;
-		case SDLK_v: key[0xF] = 0; break;
+		case SDLK_z: keys[0xA] = 0; break;
+		case SDLK_x: keys[0x0] = 0; break;
+		case SDLK_c: keys[0xB] = 0; break;
+		case SDLK_v: keys[0xF] = 0; break;
 
 		default:
 			break;
@@ -155,8 +148,7 @@ void Chip8::handleKey(SDL_Event e) {
 void Chip8::emulateCycle() {
 	// mem boundary check
 	if (pc >= MEMORY_SIZE) {
-		printf("pc is out of memory boundary!");
-		std::cin.get();
+		throw exception("Program counter is out of memory boundary!");
 	}
 
 	// Fetch Opcode
@@ -192,9 +184,9 @@ void Chip8::emulateCycle() {
 			pc = nnn;
 			break;
 		case 0x2000: // 2NNN: calls the subroutine at address NNN
-			// TODO: make sure we don't get stack overflow
 			stack[sp] = pc;
 			++sp;
+			if (sp > NUM_LEVEL_STACK) throw exception("Stack overflow!");
 			pc = nnn;
 			break;
 		case 0x3000: // 3XNN: skips the next instruction if VX equals NN
@@ -310,13 +302,13 @@ void Chip8::emulateCycle() {
 		case 0xE000:
 			switch (opcode & 0x00FF) {
 				case 0x009E: // EX9E: skips the next instruction if the key stored in VX is pressed
-					if (key[V[x]] == 1)
+					if (keys[V[x]] == 1)
 						pc += 4;
 					else
 						pc += 2;
 					break;
 				case 0x00A1: // EXA1: skips the next instruction if the key stored in VX isn't pressed
-					if (key[V[x]] == 0)
+					if (keys[V[x]] == 0)
 						pc += 4;
 					else
 						pc += 2;
@@ -333,8 +325,13 @@ void Chip8::emulateCycle() {
 					pc += 2;
 					break;
 				case 0x000A: // FX0A: a key press is awaited, and then stored in VX
-					V[x] = getKeyPress();
-					pc += 2;
+                    for (int i = 0; i < 16; i++) {
+                        if (keys[i] == 1) {
+                            V[x] = i;
+                            pc += 2;
+                            break;
+                        }
+                    }
 					break;
 				case 0x0015: // FX15: sets the delay timer to VX
 					delay_timer = V[x];

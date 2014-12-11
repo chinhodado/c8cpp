@@ -1,19 +1,11 @@
 #include "stdafx.h"
-#include <stdlib.h>
-#include <time.h>
 #include <string>
 #include "chip8.h"
 #include <SDL.h>
-#include <stdio.h>
 #include <iostream>
 #include <fstream>
-#include <chrono>
-#include <thread>
 
-void setupGraphics() {
-}
-
-void drawGraphics(Chip8 chip8, SDL_Window* window, SDL_Renderer* renderer) {
+void drawGraphics(const Chip8& chip8, SDL_Window* window, SDL_Renderer* renderer) {
 	// Set render color to black and clear screen with this color
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 	SDL_RenderClear(renderer);
@@ -38,11 +30,6 @@ void drawGraphics(Chip8 chip8, SDL_Window* window, SDL_Renderer* renderer) {
 	SDL_RenderPresent(renderer);
 }
 
-Chip8 chip8;
-
-void setupInput() {
-}
-
 //Screen dimension constants
 const int SCREEN_WIDTH  = 640;
 const int SCREEN_HEIGHT = 320;
@@ -51,19 +38,18 @@ const int SCREEN_FPS = 60;
 const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
 
 int _tmain(int argc, _TCHAR* argv[]) {
-	//// Set up render system and register input callbacks
-	//setupGraphics();
-	//setupInput();
+	Chip8 chip8;
 
 	// Initialize the Chip8 system and load the game into the memory
 	chip8.initialize();
 	chip8.loadGame();
 
 	// Initialize SDL
-	SDL_Init(SDL_INIT_EVERYTHING);
+    SDL_Init(SDL_INIT_VIDEO);
 
 	// The window we'll be rendering to
-	SDL_Window* window = SDL_CreateWindow("Chin's Chip8 Emu", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+    std::string windowName = "c8cpp - " + chip8.gameName;
+	SDL_Window* window = SDL_CreateWindow(windowName.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 		SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 	if (window == NULL) {
 		printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
